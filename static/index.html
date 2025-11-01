@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Simulación Caminantes 😀</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: white; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+  </style>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+  <script>
+    const canvas = document.getElementById('scene');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const groundY = canvas.height * 0.85;
+    const walkers = [];
+    const objects = [];
+
+    // === CLASE CAMINANTE ===
+    class Walker {
+      constructor(user) {
+        this.user = user;
+        this.x = 50;
+        this.y = groundY - 10;
+        this.speed = 1 + Math.random() * 2;
+        this.emoji = "😀";
+        this.direction = 1; // 1 = derecha, -1 = izquierda
+        this.jumpOffset = 0;
+        this.jumping = false;
+        this.reactionCooldown = 0;
+      }
+
+      update() {
+        // Movimiento horizontal
+        this.x += this.speed * this.direction;
+
+        // Saltar si llega al borde
+        if (this.x > canvas.width - 60 || this.x < 30) {
+          this.direction *= -1;
+          this.startJump();
+        }
+
+        // Simulación de salto
+        if (this.jumping) {
+          this.jumpOffset = Math.sin(Date.now() / 100) * 20;
+          if (this.jumpOffset <= 0) this.jumping = false;
+        }
+
+        // Reacción por colisión
+        if (this.reactionCooldown > 0) {
+          this.reactionCooldown--;
+          if (this.reactionCooldown === 0) this.emoji = "😀";
+        }
+      }
+
+      draw() {
+        ctx.font = "48px sans-serif";
+        ctx.fillText(this.emoji, this.x, this.y - this.jumpOffset);
+      }
+
+      startJump() {
+        this.jumping = true;
+      }
+
+      react() {
+        this.emoji = "😮";
+        this.reactionCooldown = 60;
+      }
+    }
+
+    // === CLASE OBJETO ===
+    class FallingObject {
+      constructor(label) {
+        this.label = label;
+        this.x = Math.random() * (canvas.width - 60) + 30;
+        this.y = -30;
+        this.speed = 3 + Math.random() * 2;
+        this.grounded = false;
+        this.life = 300; // frames antes de desaparecer
+      }
+
+      update() {
+        if (!this.grounded) {
+          this.y += this.speed;
+          if (this.y >= groundY - 30) {
+            this.y = groundY - 30;
+            this.grounded = true;
+          }
+        } else {
+          this.life--;
+        }
+      }
+
+      draw() {
+        ctx.font = "32px sans-serif";
+        ctx.fillText(this.label, this.x, this.y);
+      }
+
+      isNear(walker) {
+        return Math.abs(this.x - walker.x) < 50 && Math.abs(this.y - walker.y) < 50;
+      }
+    }
+
+    // === LOOP DE ANIMACIÓN ===
+    function drawGround() {
+      ctx.beginPath();
+      ctx.moveTo(0, groundY);
+      ctx.lineTo(canvas.width, groundY);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "#000";
+      ctx.stroke();
+    }
+
+    function loop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawGround();
+
+      // Actualizar y dibujar caminantes
+      walkers.forEach(w => { w.update(); w.draw(); });
+
+      // Actualizar objetos y detectar interacciones
+      for (let i = objects.length - 1; i >= 0; i--) {
+        const o = objects[i];
+        o.update();
+        o.draw();
+
+        // Colisión con caminantes
+        walkers.forEach(w => {
+          if (o.isNear(w)) w.react();
+        });
+
+        if (o.life <= 0) objects.splice(i, 1);
+      }
+
+      requestAnimationFrame(loop);
+    }
+
+    loop();
+
+    // === CONEXIÓN WEBSOCKET ===
+    const ws = new WebSocket("ws://localhost:8765");
+
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      if (msg.type === "chat") {
+        walkers.push(new Walker(msg.user));
+      }
+      if (msg.type === "donation") {
+        objects.push(new FallingObject(msg.item || "🎁"));
+      }
+    };
+  </script>
+</body>
+</html>

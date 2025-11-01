@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Caminantes con Interacciones 💰</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: white;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <script>
+    const canvas = document.getElementById("scene");
+    const ctx = canvas.getContext("2d");
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    // ------------------------------
+    // 🧍 CLASE CAMINANTE
+    // ------------------------------
+    class Walker {
+      constructor(name, emoji, x, y, direction = 1, speed = 2) {
+        this.name = name;
+        this.emoji = emoji;
+        this.x = x;
+        this.y = y;
+        this.direction = direction; // 1 = derecha, -1 = izquierda
+        this.speed = speed;
+        this.jumpHeight = 0;
+        this.isJumping = false;
+        this.jumpVelocity = 0;
+        this.hasBounced = false;
+        this.jumpCount = 0; // para doble salto en interacción
+      }
+
+      draw() {
+        ctx.font = "48px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(this.emoji, this.x, this.y - this.jumpHeight);
+
+        ctx.font = "16px monospace";
+        ctx.fillText(this.name, this.x, this.y - 50 - this.jumpHeight);
+      }
+
+      update() {
+        // movimiento horizontal incluso durante salto
+        this.x += this.speed * this.direction;
+
+        // rebote en los bordes
+        if (this.x >= canvas.width - 50 && this.direction === 1 && !this.hasBounced) {
+          this.direction = -1;
+          this.jump();
+          this.hasBounced = true;
+        } else if (this.x <= 50 && this.direction === -1 && !this.hasBounced) {
+          this.direction = 1;
+          this.jump();
+          this.hasBounced = true;
+        }
+
+        if (this.x > 60 && this.x < canvas.width - 60) {
+          this.hasBounced = false;
+        }
+
+        // animación de salto
+        if (this.isJumping) {
+          this.jumpHeight += this.jumpVelocity;
+          this.jumpVelocity -= 0.5;
+          if (this.jumpHeight <= 0) {
+            this.jumpHeight = 0;
+            this.jumpCount--;
+            if (this.jumpCount > 0) {
+              // iniciar siguiente salto
+              this.jumpVelocity = 8;
+            } else {
+              this.isJumping = false;
+            }
+          }
+        }
+      }
+
+      jump(times = 1) {
+        if (!this.isJumping) {
+          this.isJumping = true;
+          this.jumpVelocity = 8;
+          this.jumpCount = times;
+        }
+      }
+
+      // detección de colisión con objeto
+      collidesWith(obj) {
+        const dx = this.x - obj.x;
+        const dy = (this.y - this.jumpHeight) - obj.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return distance < 40; // tamaño aproximado del emoji
+      }
+    }
+
+    // ------------------------------
+    // 🎁 CLASE OBJETO INTERACTIVO
+    // ------------------------------
+    class GiftObject {
+      constructor(type, x, y) {
+        this.type = type;
+        this.x = x;
+        this.y = y;
+        this.collected = false;
+      }
+
+      draw() {
+        if (this.collected) return;
+        ctx.font = "40px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(this.type, this.x, this.y);
+      }
+    }
+
+    // ------------------------------
+    // 🎨 VARIABLES GLOBALES
+    // ------------------------------
+    const walkers = [];
+    const objects = [];
+    const groundY = canvas.height * 0.8;
+
+    walkers.push(new Walker("Default", "😀", 100, groundY, 1, 2));
+
+    // ------------------------------
+    // 🔌 CONEXIÓN WEBSOCKET
+    // ------------------------------
+    const socket = new WebSocket("ws://localhost:6789");
+
+    socket.onopen = () => console.log("✅ Conectado al servidor WebSocket");
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      console.log("📩 Evento recibido:", data);
+      if (data.type === "donation") handleDonation(data);
+    };
+
+    socket.onclose = () => console.warn("⚠️ Conexión WebSocket cerrada");
+
+    // ------------------------------
+    // 💰 PROCESAR DONACIÓN
+    // ------------------------------
+    function handleDonation(donation) {
+      const { user, amount } = donation;
+
+      if (amount < 10) {
+        createGift(donation);
+      } else if (amount < 50) {
+        createWalkerFromDonation(donation);
+      } else {
+        createWalkerFromDonation(donation);
+        createGift(donation);
+      }
+
+      showDonationMessage(`${user} donó ${amount}! 🎉`);
+    }
+
+    // ------------------------------
+    // 🧍 CREAR NUEVO CAMINANTE
+    // ------------------------------
+    function createWalkerFromDonation(donation) {
+      const { user, amount } = donation;
+      let emoji = "🙂";
+      if (amount >= 10) emoji = "😎";
+      if (amount >= 50) emoji = "🤑";
+
+      const startX = Math.random() * (canvas.width - 100) + 50;
+      const direction = Math.random() > 0.5 ? 1 : -1;
+      const walker = new Walker(user, emoji, startX, groundY, direction, 2 + Math.random() * 2);
+
+      walker.jump();
+      walkers.push(walker);
+    }
+
+    // ------------------------------
+    // 🎁 CREAR OBJETO
+    // ------------------------------
+    function createGift(donation) {
+      const { amount } = donation;
+      let emoji = "🎁";
+      if (amount < 5) emoji = "💰";
+      if (amount >= 5 && amount < 10) emoji = "💎";
+
+      const x = Math.random() * (canvas.width - 100) + 50;
+      const obj = new GiftObject(emoji, x, groundY);
+      objects.push(obj);
+    }
+
+    // ------------------------------
+    // 🗨️ MENSAJE DE DONACIÓN
+    // ------------------------------
+    let donationMessage = "";
+    let messageTimer = 0;
+
+    function showDonationMessage(msg) {
+      donationMessage = msg;
+      messageTimer = 180;
+    }
+
+    function drawDonationMessage() {
+      if (messageTimer > 0) {
+        ctx.font = "28px sans-serif";
+        ctx.fillStyle = "#222";
+        ctx.textAlign = "center";
+        ctx.fillText(donationMessage, canvas.width / 2, 80);
+        messageTimer--;
+      }
+    }
+
+    // ------------------------------
+    // 🔁 BUCLE PRINCIPAL
+    // ------------------------------
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // suelo
+      ctx.beginPath();
+      ctx.moveTo(50, groundY + 5);
+      ctx.lineTo(canvas.width - 50, groundY + 10);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "#000";
+      ctx.stroke();
+
+      // dibujar objetos
+      for (const obj of objects) obj.draw();
+
+      // actualizar caminantes
+      for (const walker of walkers) {
+        walker.update();
+        walker.draw();
+
+        // detectar colisión con objetos
+        for (const obj of objects) {
+          if (!obj.collected && walker.collidesWith(obj)) {
+            obj.collected = true;
+            walker.jump(2); // doble salto en el mismo lugar
+          }
+        }
+      }
+
+      drawDonationMessage();
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+  </script>
+</body>
+</html>
