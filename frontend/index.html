@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>DotLemor - Frontend modular</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; background:#111; color:#fff; text-align:center; }
+    #stage { display:block; margin: 16px auto; background: #222; border-radius: 8px; }
+    .controls { margin-bottom: 12px; }
+    button { margin: 6px; padding: 8px 14px; border-radius:6px; border:none; cursor:pointer; background:#2e86de; color:#fff; }
+  </style>
+</head>
+<body>
+  <h1>DotLemor Simulator (modular)</h1>
+  <div class="controls">
+    <button id="btnWalker">Agregar caminante</button>
+    <button id="btnDonation">Simular donación</button>
+  </div>
+
+  <!-- canvas -->
+  <canvas id="gameCanvas" width="900" height="360"></canvas>
+
+  <!-- entry point as module -->
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
