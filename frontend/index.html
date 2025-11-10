@@ -2,25 +2,394 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>DotLemor - Frontend modular</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DotLemor - Simulador Interactivo</title>
   <style>
-    body { margin: 0; font-family: sans-serif; background:#111; color:#fff; text-align:center; }
-    #stage { display:block; margin: 16px auto; background: #222; border-radius: 8px; }
-    .controls { margin-bottom: 12px; }
-    button { margin: 6px; padding: 8px 14px; border-radius:6px; border:none; cursor:pointer; background:#2e86de; color:#fff; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 2.5em;
+      background: linear-gradient(45deg, #2e86de, #54a0ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+    }
+
+    .status-bar {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 0.9em;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-indicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    .status-indicator.connected {
+      background: #0be881;
+      box-shadow: 0 0 10px #0be881;
+    }
+
+    .status-indicator.disconnected {
+      background: #ff3838;
+      box-shadow: 0 0 10px #ff3838;
+    }
+
+    .status-indicator.connecting {
+      background: #ffa502;
+      box-shadow: 0 0 10px #ffa502;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    #gameCanvas {
+      display: block;
+      background: #2d3436;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      margin-bottom: 20px;
+      cursor: crosshair;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      justify-content: center;
+      max-width: 900px;
+      margin-bottom: 20px;
+    }
+
+    .control-group {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 15px;
+      border-radius: 8px;
+      backdrop-filter: blur(10px);
+    }
+
+    .control-group h3 {
+      font-size: 1.1em;
+      margin-bottom: 10px;
+      color: #54a0ff;
+    }
+
+    button {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    #btnWalker {
+      background: linear-gradient(45deg, #5f27cd, #341f97);
+      color: white;
+    }
+
+    #btnWalker:hover {
+      background: linear-gradient(45deg, #6c5ce7, #5f27cd);
+    }
+
+    #btnDonation {
+      background: linear-gradient(45deg, #feca57, #ff9ff3);
+      color: #2d3436;
+    }
+
+    #btnDonation:hover {
+      background: linear-gradient(45deg, #ff9ff3, #feca57);
+    }
+
+    .donation-form {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .donation-form input {
+      padding: 10px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      font-size: 1em;
+      min-width: 120px;
+    }
+
+    .donation-form input::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .donation-form input:focus {
+      outline: none;
+      border-color: #54a0ff;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    #btnSendDonation {
+      background: linear-gradient(45deg, #0be881, #05c46b);
+      color: white;
+    }
+
+    #btnSendDonation:hover {
+      background: linear-gradient(45deg, #05c46b, #0be881);
+    }
+
+    .debug-panel {
+      background: rgba(0, 0, 0, 0.5);
+      padding: 15px;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+      max-width: 900px;
+      width: 100%;
+    }
+
+    .debug-panel h3 {
+      margin-bottom: 10px;
+      color: #54a0ff;
+    }
+
+    .debug-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+    }
+
+    .debug-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+    }
+
+    .debug-label {
+      color: #a4b0be;
+    }
+
+    .debug-value {
+      color: #0be881;
+      font-weight: bold;
+    }
+
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 20px;
+      border-radius: 8px;
+      color: white;
+      font-weight: 600;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+      animation: slideIn 0.3s ease;
+      z-index: 1000;
+      max-width: 300px;
+    }
+
+    .notification.success {
+      background: linear-gradient(45deg, #0be881, #05c46b);
+    }
+
+    .notification.error {
+      background: linear-gradient(45deg, #ff3838, #ff4757);
+    }
+
+    .notification.warning {
+      background: linear-gradient(45deg, #ffa502, #ff6348);
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes slideOut {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+    }
+
+    .loading {
+      position: relative;
+      pointer-events: none;
+    }
+
+    .loading::after {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      top: 50%;
+      left: 50%;
+      margin-left: -8px;
+      margin-top: -8px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 1.8em;
+      }
+
+      #gameCanvas {
+        max-width: 100%;
+        height: auto;
+      }
+
+      .controls {
+        flex-direction: column;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>DotLemor Simulator (modular)</h1>
-  <div class="controls">
-    <button id="btnWalker">Agregar caminante</button>
-    <button id="btnDonation">Simular donación</button>
+  <header>
+    <h1>🎮 DotLemor Simulator</h1>
+    <p>Simulador Interactivo de Eventos en Tiempo Real</p>
+  </header>
+
+  <!-- Barra de estado -->
+  <div class="status-bar">
+    <div class="status-item">
+      <div class="status-indicator disconnected" id="wsIndicator"></div>
+      <span id="wsStatus">WebSocket: Desconectado</span>
+    </div>
+    <div class="status-item">
+      <div class="status-indicator disconnected" id="apiIndicator"></div>
+      <span id="apiStatus">API: Desconocido</span>
+    </div>
   </div>
 
-  <!-- canvas -->
-  <canvas id="gameCanvas" width="900" height="360"></canvas>
+  <!-- Canvas principal -->
+  <canvas id="gameCanvas" width="900" height="500"></canvas>
 
-  <!-- entry point as module -->
+  <!-- Controles -->
+  <div class="controls">
+    <div class="control-group">
+      <h3>🚶 Caminantes</h3>
+      <button id="btnWalker">Crear Walker</button>
+    </div>
+
+    <div class="control-group">
+      <h3>💰 Donaciones</h3>
+      <button id="btnDonation" style="margin-bottom: 10px;">Donación Aleatoria</button>
+      
+      <div class="donation-form">
+        <input type="number" id="donationAmount" placeholder="Monto ($)" min="1" max="10000" step="0.01">
+        <input type="text" id="donationUser" placeholder="Usuario" maxlength="50">
+        <input type="text" id="donationMessage" placeholder="Mensaje (opcional)" maxlength="200">
+        <button id="btnSendDonation">Enviar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel de debug -->
+  <div class="debug-panel">
+    <h3>📊 Estadísticas en Tiempo Real</h3>
+    <div class="debug-grid">
+      <div class="debug-item">
+        <span class="debug-label">FPS:</span>
+        <span class="debug-value" id="fps">0</span>
+      </div>
+      <div class="debug-item">
+        <span class="debug-label">Walkers:</span>
+        <span class="debug-value" id="walkerCount">0</span>
+      </div>
+      <div class="debug-item">
+        <span class="debug-label">Donaciones:</span>
+        <span class="debug-value" id="donationCount">0</span>
+      </div>
+      <div class="debug-item">
+        <span class="debug-label">Objetos:</span>
+        <span class="debug-value" id="objectCount">0</span>
+      </div>
+      <div class="debug-item">
+        <span class="debug-label">Eventos WS:</span>
+        <span class="debug-value" id="wsEventCount">0</span>
+      </div>
+      <div class="debug-item">
+        <span class="debug-label">Conectado:</span>
+        <span class="debug-value" id="connectionTime">--</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Entry point como módulo ES6 -->
   <script type="module" src="./js/app.js"></script>
 </body>
 </html>

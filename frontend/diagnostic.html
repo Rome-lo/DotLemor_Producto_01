@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>🔍 Diagnóstico DotLemor</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #1a1a2e;
+      color: white;
+      font-family: monospace;
+      font-size: 14px;
+    }
+    
+    h1 { color: #0be881; }
+    h2 { color: #54a0ff; margin-top: 30px; }
+    
+    .section {
+      background: rgba(255,255,255,0.1);
+      padding: 15px;
+      border-radius: 8px;
+      margin: 15px 0;
+    }
+    
+    .status {
+      padding: 10px;
+      margin: 5px 0;
+      border-radius: 4px;
+      border-left: 4px solid;
+    }
+    
+    .status.ok { background: rgba(11, 232, 129, 0.2); border-color: #0be881; }
+    .status.error { background: rgba(255, 56, 56, 0.2); border-color: #ff3838; }
+    .status.warning { background: rgba(255, 165, 2, 0.2); border-color: #ffa502; }
+    
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      background: #5f27cd;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    button:hover { background: #6c5ce7; }
+    
+    #canvas {
+      display: block;
+      margin: 20px auto;
+      background: #2d3436;
+      border: 3px solid #0be881;
+    }
+    
+    .code {
+      background: #000;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-size: 12px;
+      color: #0be881;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔍 DotLemor - Herramienta de Diagnóstico</h1>
+  
+  <div class="section">
+    <h2>1️⃣ Verificación del Sprite</h2>
+    <div id="spriteStatus"></div>
+    <button onclick="testSprite()">🔄 Verificar Sprite</button>
+  </div>
+  
+  <div class="section">
+    <h2>2️⃣ Test de Canvas</h2>
+    <canvas id="canvas" width="900" height="500"></canvas>
+    <div style="text-align: center;">
+      <button onclick="testBasicDraw()">🎨 Test Dibujo Básico</button>
+      <button onclick="testSpritePosition()">📍 Test Posición Sprite</button>
+      <button onclick="testWalkerAnimation()">🚶 Test Animación Completa</button>
+      <button onclick="clearCanvas()">🗑️ Limpiar</button>
+    </div>
+    <div id="canvasInfo" class="code" style="margin-top: 15px;"></div>
+  </div>
+  
+  <div class="section">
+    <h2>3️⃣ Información del Sistema</h2>
+    <div id="systemInfo"></div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Cargar sprite
+    const sprite = new Image();
+    sprite.src = './assets/walkers/human.png';
+    
+    let spriteLoaded = false;
+    
+    sprite.onload = () => {
+      spriteLoaded = true;
+      console.log('✅ Sprite cargado');
+      testSprite();
+    };
+    
+    sprite.onerror = () => {
+      console.error('❌ Error al cargar sprite');
+      showStatus('spriteStatus', 
+        '❌ ERROR: No se pudo cargar ./assets/walkers/human.png<br>' +
+        'Verifica que el archivo existe en la ubicación correcta.', 
+        'error'
+      );
+    };
+
+    function testSprite() {
+      const status = document.getElementById('spriteStatus');
+      status.innerHTML = '';
+      
+      if (!spriteLoaded) {
+        showStatus('spriteStatus', '⏳ Esperando carga del sprite...', 'warning');
+        return;
+      }
+      
+      const info = `
+        <div class="status ok">✅ Sprite cargado correctamente</div>
+        <div class="status ok">
+          📐 Dimensiones: ${sprite.width}x${sprite.height}<br>
+          🔢 Frames por fila: ${sprite.width / 64} (esperado: 8)<br>
+          🔢 Número de filas: ${sprite.height / 64} (esperado: 8)<br>
+          📏 Tamaño por frame: 64x64px
+        </div>
+      `;
+      status.innerHTML = info;
+      
+      // Dibujar preview del sprite
+      clearCanvas();
+      ctx.fillStyle = 'white';
+      ctx.font = '14px monospace';
+      ctx.fillText('Preview del Sprite Sheet:', 10, 20);
+      
+      // Dibujar sprite completo (reducido)
+      const scale = 0.5;
+      ctx.drawImage(sprite, 0, 0, sprite.width, sprite.height, 
+                    10, 30, sprite.width * scale, sprite.height * scale);
+      
+      // Resaltar fila de caminar (fila 1, índice 1)
+      ctx.strokeStyle = '#0be881';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(10, 30 + (64 * scale), sprite.width * scale, 64 * scale);
+      ctx.fillStyle = '#0be881';
+      ctx.fillText('← Fila de CAMINAR (row: 1)', sprite.width * scale + 20, 30 + (64 * scale) + 30);
+    }
+
+    function testBasicDraw() {
+      clearCanvas();
+      
+      // Test 1: Rectángulo simple
+      ctx.fillStyle = 'red';
+      ctx.fillRect(50, 50, 100, 100);
+      ctx.fillStyle = 'white';
+      ctx.font = '14px monospace';
+      ctx.fillText('Test 1: Rectángulo Rojo', 50, 40);
+      
+      // Test 2: Círculo
+      ctx.fillStyle = 'blue';
+      ctx.beginPath();
+      ctx.arc(250, 100, 50, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'white';
+      ctx.fillText('Test 2: Círculo Azul', 200, 40);
+      
+      // Test 3: Línea
+      ctx.strokeStyle = 'yellow';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(350, 50);
+      ctx.lineTo(450, 150);
+      ctx.stroke();
+      ctx.fillStyle = 'white';
+      ctx.fillText('Test 3: Línea Amarilla', 350, 40);
+      
+      updateCanvasInfo('✅ Canvas funcionando correctamente');
+    }
+
+    function testSpritePosition() {
+      if (!spriteLoaded) {
+        updateCanvasInfo('❌ Sprite no cargado');
+        return;
+      }
+      
+      clearCanvas();
+      
+      const groundY = 436;
+      
+      // Dibujar suelo
+      ctx.fillStyle = '#636e72';
+      ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+      ctx.fillStyle = 'white';
+      ctx.font = '12px monospace';
+      ctx.fillText('Suelo (Y=' + groundY + ')', 10, groundY - 5);
+      
+      // Posiciones a probar
+      const positions = [
+        { x: 50, y: 372, label: 'Inicio Izquierda' },
+        { x: 400, y: 372, label: 'Centro' },
+        { x: 800, y: 372, label: 'Inicio Derecha' }
+      ];
+      
+      positions.forEach(pos => {
+        // Dibujar frame 0 de la fila 1 (caminar)
+        const sourceX = 0;
+        const sourceY = 64; // Fila 1
+        
+        ctx.drawImage(sprite, sourceX, sourceY, 64, 64, pos.x, pos.y, 64, 64);
+        
+        // Label
+        ctx.fillStyle = 'white';
+        ctx.font = '12px monospace';
+        ctx.fillText(pos.label, pos.x, pos.y - 5);
+        ctx.fillText(`(${pos.x}, ${pos.y})`, pos.x, pos.y + 70);
+        
+        // Cuadro de referencia
+        ctx.strokeStyle = '#0be881';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(pos.x, pos.y, 64, 64);
+      });
+      
+      updateCanvasInfo(`✅ Sprite dibujado en 3 posiciones
+Y calculado: groundY(${groundY}) - 64 = ${groundY - 64}
+Posición correcta: Y = 372`);
+    }
+
+    function testWalkerAnimation() {
+      if (!spriteLoaded) {
+        updateCanvasInfo('❌ Sprite no cargado');
+        return;
+      }
+      
+      clearCanvas();
+      updateCanvasInfo('🎬 Animación iniciada...');
+      
+      const groundY = 436;
+      let x = -64;
+      let frame = 0;
+      const frameSpeed = 0.15;
+      
+      function animate() {
+        // Limpiar
+        ctx.fillStyle = '#2d3436';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Suelo
+        ctx.fillStyle = '#636e72';
+        ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+        
+        // Dibujar walker
+        const sourceX = Math.floor(frame) * 64;
+        const sourceY = 64; // Fila 1 (caminar)
+        const y = 372;
+        
+        ctx.drawImage(sprite, sourceX, sourceY, 64, 64, x, y, 64, 64);
+        
+        // Info
+        ctx.fillStyle = 'white';
+        ctx.font = '12px monospace';
+        ctx.fillText(`X: ${Math.floor(x)} | Frame: ${Math.floor(frame)}`, 10, 20);
+        
+        // Actualizar
+        x += 2;
+        frame += frameSpeed;
+        if (frame >= 8) frame = 0;
+        
+        // Continuar o detener
+        if (x < canvas.width + 64) {
+          requestAnimationFrame(animate);
+        } else {
+          updateCanvasInfo('✅ Animación completada');
+        }
+      }
+      
+      animate();
+    }
+
+    function clearCanvas() {
+      ctx.fillStyle = '#2d3436';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function updateCanvasInfo(text) {
+      document.getElementById('canvasInfo').textContent = text;
+    }
+
+    function showStatus(elementId, html, type) {
+      const el = document.getElementById(elementId);
+      el.innerHTML = `<div class="status ${type}">${html}</div>`;
+    }
+
+    // System info
+    function updateSystemInfo() {
+      const info = `
+        <div class="status ok">
+          🌐 User Agent: ${navigator.userAgent}<br>
+          📱 Plataforma: ${navigator.platform}<br>
+          🎨 Canvas soportado: ${!!canvas.getContext ? 'Sí' : 'No'}<br>
+          📐 Canvas size: ${canvas.width}x${canvas.height}<br>
+          🖼️ Device Pixel Ratio: ${window.devicePixelRatio}
+        </div>
+      `;
+      document.getElementById('systemInfo').innerHTML = info;
+    }
+
+    updateSystemInfo();
+    
+    // Auto-test al cargar
+    setTimeout(() => {
+      if (spriteLoaded) {
+        testSprite();
+      }
+    }, 500);
+  </script>
+</body>
+</html>

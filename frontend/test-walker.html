@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Test Walker - DotLemor</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #1a1a2e;
+      color: white;
+      font-family: monospace;
+    }
+    
+    #canvas {
+      display: block;
+      margin: 20px auto;
+      background: #2d3436;
+      border: 3px solid #0be881;
+      border-radius: 8px;
+    }
+    
+    .controls {
+      text-align: center;
+      margin: 20px;
+    }
+    
+    button {
+      padding: 12px 24px;
+      font-size: 16px;
+      background: linear-gradient(45deg, #5f27cd, #341f97);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    
+    button:hover {
+      background: linear-gradient(45deg, #6c5ce7, #5f27cd);
+      transform: scale(1.05);
+    }
+    
+    .info {
+      text-align: center;
+      padding: 10px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 8px;
+      margin: 10px auto;
+      max-width: 900px;
+    }
+    
+    .log {
+      max-width: 900px;
+      margin: 20px auto;
+      padding: 15px;
+      background: rgba(0,0,0,0.5);
+      border-radius: 8px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 12px;
+    }
+    
+    .log-entry {
+      padding: 4px;
+      border-left: 3px solid #0be881;
+      margin: 4px 0;
+      padding-left: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1 style="text-align: center;">🎮 Test Walker - DotLemor</h1>
+  
+  <div class="info">
+    <div>🎯 <strong>Walkers activos:</strong> <span id="walkerCount">0</span></div>
+    <div>📊 <strong>FPS:</strong> <span id="fps">0</span></div>
+  </div>
+  
+  <canvas id="canvas" width="900" height="500"></canvas>
+  
+  <div class="controls">
+    <button onclick="createTestWalker('left')">➡️ Crear Walker (Izquierda)</button>
+    <button onclick="createTestWalker('right')">⬅️ Crear Walker (Derecha)</button>
+    <button onclick="createMultipleWalkers()">👥 Crear 5 Walkers</button>
+    <button onclick="clearAllWalkers()">🗑️ Limpiar Todo</button>
+    <button onclick="window.debugWalkers()">🔍 Debug</button>
+  </div>
+  
+  <div class="log" id="logContainer"></div>
+
+  <script type="module">
+    // ===== CONFIGURACIÓN =====
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const groundY = 420;
+
+    // ===== SPRITE =====
+    const sprite = new Image();
+    sprite.src = './assets/walkers/human.png';
+    
+    sprite.onload = () => {
+      log('✅ Sprite cargado: ' + sprite.width + 'x' + sprite.height);
+    };
+    
+    sprite.onerror = () => {
+      log('❌ ERROR: No se pudo cargar el sprite');
+      log('⚠️ Verifica que existe: ./assets/walkers/human.png');
+    };
+
+    // ===== WALKERS =====
+    const walkers = [];
+    let walkerIdCounter = 0;
+
+    const SPRITE_CONFIG = {
+      frameWidth: 64,
+      frameHeight: 64,
+      animations: {
+        walk: { row: 2, frames: 4, speed: 0.05 },  // Fila 2 = caminar
+        jump: { row: 0, frame: 4 }  // Fila 1, frame 4 = salto
+      }
+    };
+
+    const BEHAVIOR = {
+      baseSpeed: 2.5,
+      jumpHeight: 50,
+      jumpDuration: 20,
+      jumpsAtEdge: 2
+    };
+
+    // ===== CREAR WALKER =====
+    function createWalker(direction = 'left') {
+      let startX, dir;
+      
+      if (direction === 'left') {
+        startX = -SPRITE_CONFIG.frameWidth;
+        dir = 1;
+      } else {
+        startX = canvas.width + SPRITE_CONFIG.frameWidth;
+        dir = -1;
+      }
+
+      const walker = {
+        id: ++walkerIdCounter,
+        x: startX,
+        y: 356,
+        direction: dir,
+        frame: 0,
+        speed: BEHAVIOR.baseSpeed + Math.random(),
+        jumping: false,
+        jumpFrame: 0,
+        jumpsRemaining: 0,
+        jumpCooldown: 0,
+        user: 'Walker #' + walkerIdCounter
+      };
+
+      walkers.push(walker);
+      log('👤 Walker #' + walker.id + ' creado (dirección: ' + direction + ')');
+      return walker;
+    }
+
+    // ===== UPDATE =====
+    function update(delta) {
+      for (let i = walkers.length - 1; i >= 0; i--) {
+        const w = walkers[i];
+
+        // Movimiento
+        if (!w.jumping || w.jumpCooldown > 0) {
+          w.x += w.speed * w.direction * (delta * 60);
+        }
+
+        // Bordes
+        const reachedLeft = w.x <= 0 && w.direction === -1;
+        const reachedRight = w.x >= canvas.width - SPRITE_CONFIG.frameWidth && w.direction === 1;
+
+        if ((reachedLeft || reachedRight) && !w.jumping && w.jumpCooldown === 0) {
+          w.jumpsRemaining = BEHAVIOR.jumpsAtEdge;
+          w.jumping = true;
+          w.jumpFrame = 0;
+          log('🔄 Walker #' + w.id + ' llegó al borde');
+        }
+
+        // Salto
+        if (w.jumping) {
+          w.jumpFrame++;
+          if (w.jumpFrame > BEHAVIOR.jumpDuration) {
+            w.jumping = false;
+            w.jumpFrame = 0;
+            w.jumpsRemaining--;
+
+            if (w.jumpsRemaining > 0) {
+              w.jumpCooldown = 5;
+            } else {
+              w.direction *= -1;
+              log('↔️ Walker #' + w.id + ' cambió dirección');
+            }
+          }
+        }
+
+        if (w.jumpCooldown > 0) {
+          w.jumpCooldown--;
+          if (w.jumpCooldown === 0 && w.jumpsRemaining > 0) {
+            w.jumping = true;
+            w.jumpFrame = 0;
+          }
+        }
+
+        // Animación
+        if (!w.jumping) {
+          w.frame += SPRITE_CONFIG.animations.walk.speed;
+          if (w.frame >= SPRITE_CONFIG.animations.walk.frames) {
+            w.frame = 0;
+          }
+        }
+
+        // Limpiar fuera de pantalla
+        if (w.x < -200 || w.x > canvas.width + 200) {
+          walkers.splice(i, 1);
+          log('🗑️ Walker #' + w.id + ' eliminado');
+        }
+      }
+    }
+
+    // ===== RENDER =====
+    function render() {
+      // Limpiar
+      ctx.fillStyle = '#2d3436';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Suelo
+      ctx.fillStyle = '#636e72';
+      ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+
+      // Walkers
+      walkers.forEach(w => {
+        if (!sprite.complete) {
+          // Placeholder si sprite no está listo
+          ctx.fillStyle = 'red';
+          ctx.fillRect(w.x, w.y, 64, 64);
+          return;
+        }
+
+        // Calcular Y con salto
+        let drawY = w.y;
+        if (w.jumping) {
+          const progress = w.jumpFrame / BEHAVIOR.jumpDuration;
+          drawY = w.y - Math.sin(progress * Math.PI) * BEHAVIOR.jumpHeight;
+        }
+
+        // Frame del sprite
+        let sourceX, sourceY;
+        if (w.jumping) {
+          sourceX = SPRITE_CONFIG.animations.jump.frame * SPRITE_CONFIG.frameWidth;
+          sourceY = SPRITE_CONFIG.animations.jump.row * SPRITE_CONFIG.frameHeight;
+        } else {
+          sourceX = Math.floor(w.frame) * SPRITE_CONFIG.frameWidth;
+          sourceY = SPRITE_CONFIG.animations.walk.row * SPRITE_CONFIG.frameHeight;
+        }
+
+        ctx.save();
+        
+        // Flip si va a la izquierda
+        if (w.direction === -1) {
+          ctx.translate(w.x + SPRITE_CONFIG.frameWidth, drawY);
+          ctx.scale(-1, 1);
+          ctx.drawImage(sprite, sourceX, sourceY, 64, 64, 0, 0, 64, 64);
+        } else {
+          ctx.drawImage(sprite, sourceX, sourceY, 64, 64, w.x, drawY, 64, 64);
+        }
+
+        ctx.restore();
+
+        // Nombre
+        ctx.fillStyle = 'white';
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 3;
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.strokeText(w.user, w.x + 32, drawY - 5);
+        ctx.fillText(w.user, w.x + 32, drawY - 5);
+      });
+    }
+
+    // ===== GAME LOOP =====
+    let lastTime = performance.now();
+    let fps = 0;
+    let frameCount = 0;
+    let lastFpsUpdate = 0;
+
+    function gameLoop(currentTime) {
+      const delta = (currentTime - lastTime) / 1000;
+      lastTime = currentTime;
+
+      update(delta);
+      render();
+
+      // FPS
+      frameCount++;
+      if (currentTime - lastFpsUpdate >= 1000) {
+        fps = frameCount;
+        frameCount = 0;
+        lastFpsUpdate = currentTime;
+        document.getElementById('fps').textContent = fps;
+      }
+
+      document.getElementById('walkerCount').textContent = walkers.length;
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop(performance.now());
+
+    // ===== FUNCIONES GLOBALES =====
+    window.createTestWalker = (dir) => createWalker(dir);
+    
+    window.createMultipleWalkers = () => {
+      for (let i = 0; i < 5; i++) {
+        setTimeout(() => {
+          createWalker(Math.random() > 0.5 ? 'left' : 'right');
+        }, i * 300);
+      }
+    };
+
+    window.clearAllWalkers = () => {
+      walkers.length = 0;
+      log('🗑️ Todos los walkers eliminados');
+    };
+
+    window.debugWalkers = () => {
+      console.log('=== DEBUG WALKERS ===');
+      console.log('Sprite cargado:', sprite.complete);
+      console.log('Sprite size:', sprite.width, 'x', sprite.height);
+      console.log('Walkers activos:', walkers.length);
+      console.log('Walkers:', walkers);
+      log('🔍 Debug info en consola (F12)');
+    };
+
+    // ===== LOG =====
+    const maxLogs = 20;
+    function log(message) {
+      console.log(message);
+      const logContainer = document.getElementById('logContainer');
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.textContent = new Date().toLocaleTimeString() + ' - ' + message;
+      logContainer.insertBefore(entry, logContainer.firstChild);
+      
+      // Limitar logs
+      while (logContainer.children.length > maxLogs) {
+        logContainer.removeChild(logContainer.lastChild);
+      }
+    }
+
+    log('🎮 Sistema iniciado. Esperando carga de sprite...');
+  </script>
+</body>
+</html>
